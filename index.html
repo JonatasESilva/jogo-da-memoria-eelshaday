@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dff3ff">
+  <meta name="description" content="Jogo da memória sobre os sete dias da criação. Encontre os pares e acompanhe suas jogadas e seu tempo.">
+  <title>Jogo da Memória: 7 Dias da Criação</title>
+  <style>
+    :root {
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      color: #17335f;
+      background: #e0f2fe;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-image: radial-gradient(#bae6fd 20%, transparent 20%), radial-gradient(#bae6fd 20%, transparent 20%);
+      background-position: 0 0, 25px 25px;
+      background-size: 50px 50px;
+    }
+
+    button { font: inherit; }
+    button:focus-visible { outline: 4px solid #1e3a8a; outline-offset: 4px; }
+
+    .header { width: 100%; max-width: 950px; margin-bottom: 24px; text-align: center; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 6vw, 3rem); line-height: 1.15; color: #1e3a8a; }
+    .subtitle { margin: 0 0 18px; font-size: clamp(1rem, 3vw, 1.25rem); font-weight: 700; color: #1d4ed8; }
+    .status-panel {
+      display: inline-flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px 28px;
+      padding: 14px 20px;
+      border: 2px solid white;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .88);
+      box-shadow: 0 4px 12px rgba(30, 58, 138, .1);
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .status-item { display: flex; align-items: center; gap: 8px; }
+    .status-item.moves { color: #9a3412; }
+    .status-item.time { color: #1d4ed8; }
+    .status-value { min-width: 64px; padding: 4px 10px; border-radius: 9px; font-size: 1.4rem; }
+    .moves .status-value { background: #ffedd5; }
+    .time .status-value { background: #dbeafe; }
+
+    main { width: 100%; max-width: 1024px; flex: 1; display: flex; align-items: center; }
+    .board { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .board-logo { aspect-ratio: 3 / 4; display: grid; place-items: center; }
+    .board-logo-frame { display: block; width: 90%; max-width: 170px; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: white; box-shadow: 0 5px 16px rgba(23, 51, 95, .2); }
+    .board-logo img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.18); }
+    .scene { perspective: 1000px; }
+    .card {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      display: block;
+      position: relative;
+      padding: 0;
+      border: 0;
+      border-radius: 16px;
+      background: transparent;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      transition: transform .6s cubic-bezier(.4, .2, .2, 1);
+    }
+    .card.flipped { transform: rotateY(180deg); }
+    .card:disabled { cursor: default; }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 6px;
+      border: 4px solid;
+      border-radius: 16px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, .12);
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      user-select: none;
+    }
+    .card-front { border-color: #bfdbfe; background: linear-gradient(135deg, #2563eb, #60a5fa); color: white; font-size: clamp(2rem, 7vw, 3rem); }
+    .card-back { display: block; overflow: hidden; padding: 0; border-color: #fbbf24; background: white; transform: rotateY(180deg); text-align: center; }
+    .card.matched .card-back { border-color: #059669; background: #ecfdf5; animation: pulse-match .5s ease-in-out; }
+    .card-art { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+    .card-caption { position: absolute; inset: auto 0 0; display: flex; flex-direction: column; gap: 2px; padding: 20px 4px 7px; background: linear-gradient(transparent, rgba(255, 255, 255, .96) 32%, #fff 100%); }
+    .card-day { font-size: clamp(.8rem, 2vw, 1rem); font-weight: 900; }
+    .card-description { font-size: clamp(.65rem, 1.6vw, .9rem); font-weight: 700; line-height: 1.15; }
+    @keyframes pulse-match { 50% { transform: rotateY(180deg) scale(1.05); } }
+
+    .restart-button, .play-again-button {
+      border: 3px solid #93c5fd;
+      border-radius: 999px;
+      background: #2563eb;
+      color: white;
+      padding: 12px 28px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 5px 12px rgba(30, 64, 175, .18);
+      transition: transform .2s, background-color .2s;
+    }
+    .restart-button { margin-top: 28px; }
+    .restart-button:hover, .play-again-button:hover { background: #1d4ed8; transform: translateY(-2px); }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, .65);
+    }
+    [hidden] { display: none !important; }
+    .modal-content {
+      width: 100%;
+      max-width: 450px;
+      padding: 28px;
+      border: 7px solid #fbbf24;
+      border-radius: 24px;
+      background: white;
+      text-align: center;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
+      animation: pop-in .45s ease-out;
+    }
+    .celebration { margin-bottom: 12px; font-size: 3rem; }
+    .modal h2 { margin: 0 0 8px; font-size: 2rem; color: #1e3a8a; }
+    .modal p { margin: 0 0 22px; font-size: 1.1rem; font-weight: 700; }
+    .results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 22px; }
+    .result { padding: 14px; border-radius: 12px; font-weight: 800; }
+    .result:first-child { background: #ffedd5; color: #9a3412; }
+    .result:last-child { background: #dbeafe; color: #1d4ed8; }
+    .result strong { display: block; margin-top: 4px; font-size: 1.8rem; }
+    .play-again-button { width: 100%; border-color: #fbbf24; background: #facc15; color: #713f12; }
+    .play-again-button:hover { background: #eab308; }
+    @keyframes pop-in { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    @media (min-width: 520px) { .board { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (min-width: 760px) { .board { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; } }
+    @media (max-width: 360px) { body { padding-inline: 10px; } .board { gap: 8px; } .card-face { border-width: 3px; } }
+    @media (prefers-reduced-motion: reduce) {
+      .card, .restart-button, .play-again-button { transition: none; }
+      .card.matched .card-back, .modal-content { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Gênesis: A Criação 🌍</h1>
+    <p class="subtitle">Encontre os pares dos 7 dias da criação!</p>
+    <div class="status-panel" aria-label="Status da partida">
+      <div class="status-item moves"><span>🔄 Jogadas:</span><output id="moves-counter" class="status-value">0</output></div>
+      <div class="status-item time"><span>⏱️ Tempo:</span><output id="timer-display" class="status-value">00:00</output></div>
+    </div>
+  </header>
+
+  <main>
+    <div id="game-board" class="board" role="group" aria-label="Cartas do jogo da memória">
+      <div id="board-logo" class="board-logo">
+        <span class="board-logo-frame"><img src="imagens/logo-colegio-el-shaday.jpeg" alt="Logo do Colégio El Shaday Christian School" width="170" height="170"></span>
+      </div>
+    </div>
+  </main>
+
+  <button id="restart-button" class="restart-button" type="button">Reiniciar jogo</button>
+  <p id="game-announcement" class="sr-only" role="status" aria-live="polite"></p>
+
+  <div id="victory-modal" class="modal" hidden>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="victory-title" aria-describedby="victory-description">
+      <div class="celebration" aria-hidden="true">🎉🏆✨</div>
+      <h2 id="victory-title">Parabéns!</h2>
+      <p id="victory-description">Você completou os 7 dias da criação!</p>
+      <div class="results">
+        <div class="result">Jogadas<strong id="final-moves">0</strong></div>
+        <div class="result">Tempo<strong id="final-time">00:00</strong></div>
+      </div>
+      <button id="play-again-button" class="play-again-button" type="button">Jogar novamente</button>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    const cardsData = [
+      { id: 1, image: "imagens/dia-1.jpg", text: "Dia 1", desc: "Luz e Trevas" },
+      { id: 2, image: "imagens/dia-2.jpg", text: "Dia 2", desc: "Céu e Mar" },
+      { id: 3, image: "imagens/dia-3.jpg", text: "Dia 3", desc: "Terra e Plantas" },
+      { id: 4, image: "imagens/dia-4.jpg", text: "Dia 4", desc: "Sol e Lua" },
+      { id: 5, image: "imagens/dia-5.jpg", text: "Dia 5", desc: "Aves e Peixes" },
+      { id: 6, image: "imagens/dia-6.jpg", text: "Dia 6", desc: "Animais e Homem" },
+      { id: 7, image: "imagens/dia-7.jpg", text: "Dia 7", desc: "Descanso" }
+    ];
+
+    const boardElement = document.getElementById("game-board");
+    const logoElement = document.getElementById("board-logo");
+    const movesElement = document.getElementById("moves-counter");
+    const timeElement = document.getElementById("timer-display");
+    const announcementElement = document.getElementById("game-announcement");
+    const modalElement = document.getElementById("victory-modal");
+    const restartButton = document.getElementById("restart-button");
+    const playAgainButton = document.getElementById("play-again-button");
+
+    let firstCard = null;
+    let secondCard = null;
+    let lockBoard = false;
+    let moves = 0;
+    let matches = 0;
+    let startedAt = null;
+    let secondsElapsed = 0;
+    let timerInterval = null;
+    let unflipTimeout = null;
+    let victoryTimeout = null;
+
+    function formatTime(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function renderTime() {
+      if (startedAt !== null) {
+        secondsElapsed = Math.floor((performance.now() - startedAt) / 1000);
+      }
+      timeElement.textContent = formatTime(secondsElapsed);
+    }
+
+    function startTimer() {
+      if (startedAt !== null) return;
+      startedAt = performance.now();
+      timerInterval = setInterval(renderTime, 250);
+    }
+
+    function stopTimer() {
+      if (startedAt !== null) renderTime();
+      clearInterval(timerInterval);
+      timerInterval = null;
+      startedAt = null;
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function createCard(cardInfo, position) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "scene";
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "card";
+      card.dataset.id = String(cardInfo.id);
+      card.dataset.position = String(position + 1);
+      card.dataset.description = `${cardInfo.text}: ${cardInfo.desc}`;
+      card.setAttribute("aria-label", `Carta ${position + 1} virada para baixo`);
+
+      const front = document.createElement("span");
+      front.className = "card-face card-front";
+      front.setAttribute("aria-hidden", "true");
+      front.textContent = "✨";
+
+      const back = document.createElement("span");
+      back.className = "card-face card-back";
+      back.setAttribute("aria-hidden", "true");
+      const image = document.createElement("img");
+      image.className = "card-art";
+      image.src = cardInfo.image;
+      image.alt = "";
+      image.draggable = false;
+      image.decoding = "async";
+      const caption = document.createElement("span");
+      caption.className = "card-caption";
+      for (const [className, content] of [
+        ["card-day", cardInfo.text],
+        ["card-description", cardInfo.desc]
+      ]) {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = content;
+        caption.appendChild(span);
+      }
+      back.append(image, caption);
+
+      card.append(front, back);
+      card.addEventListener("click", () => flipCard(card));
+      wrapper.appendChild(card);
+      return wrapper;
+    }
+
+    function resetSelection() {
+      firstCard = null;
+      secondCard = null;
+      lockBoard = false;
+    }
+
+    function initGame() {
+      clearTimeout(unflipTimeout);
+      clearTimeout(victoryTimeout);
+      unflipTimeout = null;
+      victoryTimeout = null;
+      stopTimer();
+      secondsElapsed = 0;
+      moves = 0;
+      matches = 0;
+      resetSelection();
+      movesElement.textContent = "0";
+      timeElement.textContent = "00:00";
+      announcementElement.textContent = "";
+      modalElement.hidden = true;
+
+      const deck = shuffle(cardsData.flatMap(card => [card, card]));
+      boardElement.replaceChildren(...deck.map(createCard), logoElement);
+    }
+
+    function flipCard(card) {
+      if (lockBoard || card.classList.contains("flipped") || card.classList.contains("matched")) return;
+      startTimer();
+      card.classList.add("flipped");
+      card.setAttribute("aria-label", card.dataset.description);
+
+      if (firstCard === null) {
+        firstCard = card;
+        return;
+      }
+
+      secondCard = card;
+      moves++;
+      movesElement.textContent = String(moves);
+
+      if (firstCard.dataset.id === secondCard.dataset.id) {
+        firstCard.classList.add("matched");
+        secondCard.classList.add("matched");
+        firstCard.setAttribute("aria-label", `${firstCard.dataset.description}, par encontrado`);
+        secondCard.setAttribute("aria-label", `${secondCard.dataset.description}, par encontrado`);
+        firstCard.disabled = true;
+        secondCard.disabled = true;
+        matches++;
+        announcementElement.textContent = `Par encontrado! ${matches} de ${cardsData.length}.`;
+        resetSelection();
+
+        if (matches === cardsData.length) {
+          stopTimer();
+          lockBoard = true;
+          victoryTimeout = setTimeout(showVictory, 650);
+        }
+        return;
+      }
+
+      lockBoard = true;
+      announcementElement.textContent = "As cartas são diferentes. Tente novamente.";
+      const first = firstCard;
+      const second = secondCard;
+      unflipTimeout = setTimeout(() => {
+        for (const cardToHide of [first, second]) {
+          cardToHide.classList.remove("flipped");
+          cardToHide.setAttribute("aria-label", `Carta ${cardToHide.dataset.position} virada para baixo`);
+        }
+        unflipTimeout = null;
+        resetSelection();
+      }, 1000);
+    }
+
+    function showVictory() {
+      victoryTimeout = null;
+      document.getElementById("final-moves").textContent = String(moves);
+      document.getElementById("final-time").textContent = formatTime(secondsElapsed);
+      modalElement.hidden = false;
+      playAgainButton.focus();
+    }
+
+    restartButton.addEventListener("click", initGame);
+    playAgainButton.addEventListener("click", () => {
+      initGame();
+      restartButton.focus();
+    });
+    modalElement.addEventListener("keydown", event => {
+      if (event.key === "Tab") {
+        event.preventDefault();
+        playAgainButton.focus();
+      }
+    });
+
+    initGame();
+  </script>
+</body>
+</html>
